@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0a1012">
+    <meta
+      name="description"
+      content="Install or update DMI-HS firmware on a standard ESP32 from Chrome or Edge."
+    >
+    <title>DMI-HS ESP32 Installer</title>
+    <link rel="icon" href="assets/favicon.png">
+    <link rel="stylesheet" href="styles.css">
+    <script
+      type="module"
+      src="https://unpkg.com/esp-web-tools@10.1.0/dist/web/install-button.js?module"
+    ></script>
+    <script defer src="config.js"></script>
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="brandbar">
+        <a class="brand" href="./" aria-label="DMI-HS installer home">
+          <img src="assets/logo.png" alt="">
+          <span>
+            <strong>DMI-HS</strong>
+            <small>ESP32 service tool</small>
+          </span>
+        </a>
+        <a
+          class="source-link"
+          id="release-source"
+          href="#"
+          target="_blank"
+          rel="noreferrer"
+        >Firebase release</a>
+      </header>
+
+      <section class="hero" aria-labelledby="page-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Standard ESP32 · no flash encryption</p>
+          <h1 id="page-title">Install or update DMI-HS.</h1>
+          <p class="lede">
+            Connect the controller by USB, choose the operation that matches the
+            board, and let the browser write the correct files.
+          </p>
+        </div>
+        <dl class="release-card" aria-label="Available release">
+          <div>
+            <dt>Release</dt>
+            <dd id="release-version">Loading</dd>
+          </div>
+          <div>
+            <dt>Published</dt>
+            <dd id="release-published">—</dd>
+          </div>
+          <div>
+            <dt>Target</dt>
+            <dd>ESP32 · 4 MB</dd>
+          </div>
+          <div class="release-state" id="release-state">Checking Firebase</div>
+        </dl>
+      </section>
+
+      <section class="notice notice-error" id="browser-notice" hidden>
+        Web Serial is unavailable. Open this page over HTTPS in desktop Chrome
+        or Edge.
+      </section>
+
+      <section class="notice notice-error" id="release-error" hidden></section>
+
+      <section class="operations" aria-label="Choose an installation method">
+        <article class="operation operation-install">
+          <div>
+            <p class="operation-label">New or replacement board</p>
+            <h2>Full installation</h2>
+            <p class="operation-summary">
+              Starts clean and installs everything required to boot DMI-HS.
+              Existing controller settings and local records are erased.
+            </p>
+            <ul class="memory-map" aria-label="Full installation flash map">
+              <li><code>0x1000</code><span>Bootloader</span></li>
+              <li><code>0x8000</code><span>Partition table</span></li>
+              <li><code>0x20000</code><span>DMI-HS firmware</span></li>
+            </ul>
+          </div>
+          <div class="operation-action">
+            <p class="action-note">Choose erase when the installer asks.</p>
+            <esp-web-install-button id="full-install-button">
+              <button slot="activate" class="action action-install" disabled>
+                Connect and install
+              </button>
+              <span slot="unsupported" class="unsupported">
+                Use desktop Chrome or Edge.
+              </span>
+              <span slot="not-allowed" class="unsupported">
+                Open this page from HTTPS or localhost.
+              </span>
+            </esp-web-install-button>
+          </div>
+        </article>
+
+        <article class="operation operation-update">
+          <div>
+            <p class="operation-label">Working DMI-HS board</p>
+            <h2>Firmware update</h2>
+            <p class="operation-summary">
+              Replaces only the application. Wi-Fi settings, controller
+              configuration, rewards cache, and local records stay in place.
+            </p>
+            <ul class="memory-map memory-map-update" aria-label="Firmware update flash map">
+              <li><code>0x20000</code><span>DMI-HS firmware only</span></li>
+            </ul>
+            <div class="preserve-warning">
+              <strong>Keep erase turned off.</strong>
+              If the installer requires erasing, cancel and use Full
+              installation instead.
+            </div>
+          </div>
+          <div class="operation-action">
+            <label class="confirmation">
+              <input id="update-confirm" type="checkbox">
+              <span>I am updating an existing standard DMI-HS board.</span>
+            </label>
+            <esp-web-install-button id="firmware-update-button">
+              <button slot="activate" class="action action-update" disabled>
+                Connect and update
+              </button>
+              <span slot="unsupported" class="unsupported">
+                Use desktop Chrome or Edge.
+              </span>
+              <span slot="not-allowed" class="unsupported">
+                Open this page from HTTPS or localhost.
+              </span>
+            </esp-web-install-button>
+          </div>
+        </article>
+      </section>
+
+      <section class="steps" aria-labelledby="steps-title">
+        <div>
+          <p class="eyebrow">Before connecting</p>
+          <h2 id="steps-title">Three quick checks</h2>
+        </div>
+        <ol>
+          <li>
+            <span>1</span>
+            Close PlatformIO, serial monitors, and anything else using the COM
+            port.
+          </li>
+          <li>
+            <span>2</span>
+            Use a USB data cable. Hold BOOT and tap RESET/EN if automatic
+            download mode fails.
+          </li>
+          <li>
+            <span>3</span>
+            Do not disconnect USB until the installer reports completion.
+          </li>
+        </ol>
+      </section>
+
+      <footer>
+        Firmware is loaded from the configured Firebase release. This page does
+        not enable Secure Boot, Flash Encryption, or modify security eFuses.
+      </footer>
+    </main>
+  </body>
+</html>

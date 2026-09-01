@@ -1,0 +1,28 @@
+# Keep the web updater source public, but do not publish firmware binaries here.
+firmware/
+*.bin
+*.digest
+
+# Local server / tooling noise
+*.log
+.DS_Store
+Thumbs.db
+.agents/
+.codex/
+
+# Secrets, just in case they are copied here by mistake.
+.env
+.env.*
+keys/
+*.key
+*.pem
+*.p8
+*.p12
+*.pfx
+*.crt
+*.csr
+service-account*.json
+firebase-adminsdk*.json
+credentials*.json
+secret*.json
+secrets*.json
