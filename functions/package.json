@@ -7,7 +7,7 @@
   },
   "main": "index.mjs",
   "scripts": {
-    "check": "node --check index.mjs && node --check rate-limit.mjs",
+    "check": "node --check index.mjs && node --check rate-limit.mjs && node --check install-metrics.mjs",
     "test": "node --test"
   },
   "dependencies": {

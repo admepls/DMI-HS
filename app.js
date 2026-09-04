@@ -56,6 +56,15 @@ const functions = getFunctions(firebaseApp, config.functionsRegion);
 const getProtectedRelease = httpsCallable(functions, "getFirmwareRelease", {
   timeout: 30000
 });
+const reportSuccessfulInstall = httpsCallable(functions, "recordFirmwareInstall", {
+  timeout: 30000
+});
+
+const INSTALL_REPORTS_STORAGE_KEY = "dmiHsPendingInstallReportsV1";
+let preparedReleaseContext = null;
+let pendingInstallAttempt = null;
+let installReportFlushInFlight = false;
+let pendingInstallReportsMemory = [];
 
 function showBrowserWarning() {
   if (!browserNotice) return;
@@ -107,6 +116,10 @@ function validateRelease(value) {
   if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
     throw new Error("The protected release expired before it could be prepared.");
   }
+  const grantId = typeof value.grantId === "string" ? value.grantId.trim() : "";
+  if (!/^\d{8}-[0-9a-f-]{36}$/i.test(grantId)) {
+    throw new Error("The protected release has no installation grant.");
+  }
 
   return {
     version: value.version.trim(),
@@ -115,6 +128,7 @@ function validateRelease(value) {
         ? value.published.trim()
         : "Not specified",
     expiresAt,
+    grantId,
     remaining: value.remaining || {},
     files: {
       bootloader: requireSignedStorageUrl(value.files.bootloader, "bootloader"),
@@ -122,6 +136,150 @@ function validateRelease(value) {
       firmware: requireSignedStorageUrl(value.files.firmware, "firmware")
     }
   };
+}
+
+function createAttemptId() {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
+  }
+  const random = Math.random().toString(36).slice(2);
+  return `${Date.now().toString(36)}-${random}-${random}`;
+}
+
+function normalizePendingReports(reports) {
+  const unique = new Map();
+  for (const report of reports) {
+    if (!report || typeof report !== "object" || !report.attemptId) continue;
+    unique.set(report.attemptId, report);
+  }
+  return [...unique.values()].slice(-20);
+}
+
+function readPendingInstallReports() {
+  let stored = [];
+  try {
+    const parsed = JSON.parse(
+      localStorage.getItem(INSTALL_REPORTS_STORAGE_KEY) || "[]"
+    );
+    if (Array.isArray(parsed)) stored = parsed;
+  } catch {
+    stored = [];
+  }
+  return normalizePendingReports([...stored, ...pendingInstallReportsMemory]);
+}
+
+function writePendingInstallReports(reports) {
+  const normalized = normalizePendingReports(reports);
+  pendingInstallReportsMemory = normalized;
+  try {
+    localStorage.setItem(INSTALL_REPORTS_STORAGE_KEY, JSON.stringify(normalized));
+    pendingInstallReportsMemory = [];
+  } catch {
+    // Some private browsing modes disable localStorage. The in-memory copy
+    // still permits an immediate report while this page remains open.
+  }
+}
+
+function queueSuccessfulInstall(attempt) {
+  writePendingInstallReports([
+    ...readPendingInstallReports(),
+    { ...attempt, finishedAtMs: Date.now() }
+  ]);
+  setAccessStatus("Installation succeeded. Recording the result...", "ready");
+  void flushPendingInstallReports();
+}
+
+function isPermanentInstallReportError(error) {
+  return new Set([
+    "functions/invalid-argument",
+    "functions/permission-denied",
+    "functions/failed-precondition",
+    "functions/resource-exhausted"
+  ]).has(typeof error?.code === "string" ? error.code : "");
+}
+
+async function flushPendingInstallReports() {
+  if (installReportFlushInFlight || !currentUser) return;
+  installReportFlushInFlight = true;
+  const reportingUid = currentUser.uid;
+  const remaining = [];
+
+  try {
+    for (const report of readPendingInstallReports()) {
+      if (report.uid !== reportingUid) {
+        remaining.push(report);
+        continue;
+      }
+      try {
+        const response = await reportSuccessfulInstall({
+          grantId: report.grantId,
+          attemptId: report.attemptId,
+          operation: report.operation
+        });
+        const total = Number(response?.data?.counts?.total);
+        const totalText = Number.isFinite(total) ? ` Total recorded: ${total}.` : "";
+        setAccessStatus("Installation succeeded and was recorded." + totalText, "ready");
+      } catch (error) {
+        console.warn("Successful installation report was not accepted", error);
+        if (!isPermanentInstallReportError(error)) remaining.push(report);
+      }
+    }
+    writePendingInstallReports(remaining);
+  } finally {
+    installReportFlushInFlight = false;
+  }
+}
+
+function armInstallAttempt(operation) {
+  if (!releaseIsReady || !currentUser || !preparedReleaseContext) return;
+  pendingInstallAttempt = {
+    attemptId: createAttemptId(),
+    grantId: preparedReleaseContext.grantId,
+    operation,
+    uid: currentUser.uid,
+    version: preparedReleaseContext.version
+  };
+}
+
+function watchInstallDialog(dialog) {
+  if (!(dialog instanceof HTMLElement) || dialog.tagName !== "EWT-INSTALL-DIALOG") {
+    return;
+  }
+  const attempt = pendingInstallAttempt;
+  pendingInstallAttempt = null;
+  if (!attempt) return;
+
+  let finished = false;
+  let pollId = 0;
+  const inspect = () => {
+    const state = dialog._installState?.state;
+    if (state === "finished" && !finished) {
+      finished = true;
+      queueSuccessfulInstall(attempt);
+    }
+    if (state === "finished" || state === "error" || !dialog.isConnected) {
+      clearInterval(pollId);
+    }
+  };
+  pollId = window.setInterval(inspect, 250);
+  dialog.addEventListener("closed", inspect, { once: true });
+  inspect();
+}
+
+const installDialogObserver = new MutationObserver((records) => {
+  for (const record of records) {
+    for (const node of record.addedNodes) {
+      if (!(node instanceof HTMLElement)) continue;
+      if (node.matches("ewt-install-dialog")) watchInstallDialog(node);
+      node.querySelectorAll?.("ewt-install-dialog").forEach(watchInstallDialog);
+    }
+  }
+});
+if (document.body) {
+  installDialogObserver.observe(document.body, { childList: true, subtree: true });
 }
 
 function createInstallerManifest(release, parts) {
@@ -267,6 +425,8 @@ async function signOutCurrentUser() {
 
 async function prepareInstaller() {
   if (!currentUser || authBusy) return;
+  preparedReleaseContext = null;
+  pendingInstallAttempt = null;
   hideReleaseError();
   setAuthBusy(true);
   if (prepareButton) {
@@ -293,6 +453,10 @@ async function prepareInstaller() {
 
     if (fullInstaller) fullInstaller.manifest = fullManifestUrl;
     if (updateInstaller) updateInstaller.manifest = updateManifestUrl;
+    preparedReleaseContext = {
+      grantId: release.grantId,
+      version: release.version
+    };
     releaseIsReady = true;
     accessExpiresAt = release.expiresAt;
     operations?.classList.remove("operations-locked");
@@ -322,6 +486,8 @@ async function prepareInstaller() {
 
 onAuthStateChanged(auth, (user) => {
   currentUser = user;
+  preparedReleaseContext = null;
+  pendingInstallAttempt = null;
   hideReleaseError();
   lockRelease("");
   prepareRetryAt = 0;
@@ -335,6 +501,7 @@ onAuthStateChanged(auth, (user) => {
     if (identityMark) identityMark.textContent = name.trim().charAt(0).toUpperCase() || "A";
     if (releaseState) releaseState.textContent = "Access locked";
     setAccessStatus("Signed in. Prepare the installer when the ESP32 is connected.");
+    void flushPendingInstallReports();
   } else {
     if (signedOutControls) signedOutControls.hidden = false;
     if (signedInControls) signedInControls.hidden = true;
@@ -351,8 +518,11 @@ signInButton?.addEventListener("click", signIn);
 signOutButton?.addEventListener("click", signOutCurrentUser);
 prepareButton?.addEventListener("click", prepareInstaller);
 updateConfirm?.addEventListener("change", syncFlashActions);
+fullAction?.addEventListener("click", () => armInstallAttempt("full-install"));
+updateAction?.addEventListener("click", () => armInstallAttempt("firmware-update"));
 window.addEventListener("beforeunload", clearInstallerManifests);
 
 showBrowserWarning();
 syncFlashActions();
 setInterval(refreshAccessClock, 1000);
+setInterval(() => void flushPendingInstallReports(), 30000);

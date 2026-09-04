@@ -25,6 +25,23 @@ private files through its service account. Rate-limit counters are stored under
 `firmwareInstallerRateLimits` in the existing locked Realtime Database and old
 counter windows are removed automatically.
 
+Successful flashes are counted separately from installer preparations. The
+authenticated backend writes these counters under
+`firmwareInstallerInstallMetrics`:
+
+```text
+totals/fullInstall
+totals/firmwareUpdate
+totals/total
+daily/YYYYMMDD/...
+versions/VERSION/...
+```
+
+The page reports a success only after ESP Web Tools finishes writing, resets,
+and disconnects from the ESP32. Reports are idempotent, so retrying the same
+report cannot increment a counter twice. Temporary grants used to validate a
+report are automatically removed; the aggregate counters remain.
+
 Default limits:
 
 | Limit | Default |

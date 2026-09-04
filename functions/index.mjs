@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { initializeApp } from "firebase-admin/app";
 import { getDatabase } from "firebase-admin/database";
 import { logger } from "firebase-functions";
@@ -10,6 +10,9 @@ import {
   secondsUntilNextUtcHour,
   utcWindowKeys
 } from "./rate-limit.mjs";
+import {
+  applySuccessfulInstall
+} from "./install-metrics.mjs";
 
 initializeApp();
 const cloudStorage = new Storage();
@@ -17,6 +20,9 @@ const cloudStorage = new Storage();
 const REGION = "asia-southeast1";
 const BUCKET_NAME = "dmi-hs.firebasestorage.app";
 const RELEASE_OBJECT = "release.json";
+const INSTALL_METRICS_PATH = "firmwareInstallerInstallMetrics";
+const INSTALL_REPORT_GRACE_MS = 15 * 60 * 1000;
+const MAX_SUCCESSES_PER_GRANT = 5;
 const FIRMWARE_OBJECTS = Object.freeze({
   bootloader: "bootloader.bin",
   partitions: "partitions.bin",
@@ -78,6 +84,10 @@ function requireApprovedInstaller(request) {
   return { uid: request.auth.uid, email };
 }
 
+function installerUidKey(uid) {
+  return createHash("sha256").update(uid).digest("hex").slice(0, 32);
+}
+
 function validateRelease(value) {
   if (!value || typeof value !== "object") {
     throw new Error("release.json is not an object");
@@ -112,7 +122,7 @@ async function enforceRateLimit(uid, now) {
   const perUserDay = integerSetting("LIMIT_PER_USER_DAY", 10, 1, 200);
   const globalDay = integerSetting("LIMIT_GLOBAL_DAY", 30, 1, 1000);
   const { dayKey, hourKey } = utcWindowKeys(now);
-  const uidKey = createHash("sha256").update(uid).digest("hex").slice(0, 32);
+  const uidKey = installerUidKey(uid);
   const retryAfterHour = secondsUntilNextUtcHour(now);
   const retryAfterDay = secondsUntilNextUtcDay(now);
   const limitRef = getDatabase().ref(`firmwareInstallerRateLimits/${dayKey}`);
@@ -159,6 +169,55 @@ async function enforceRateLimit(uid, now) {
   return decision.remaining;
 }
 
+async function createInstallGrant(installer, release, now, expiresAt) {
+  const { dayKey } = utcWindowKeys(now);
+  const grantId = `${dayKey}-${randomUUID()}`;
+  const grant = {
+    uidKey: installerUidKey(installer.uid),
+    version: release.version,
+    issuedAtMs: now.getTime(),
+    expiresAtMs: expiresAt.getTime(),
+    reportByMs: expiresAt.getTime() + INSTALL_REPORT_GRACE_MS,
+    successCount: 0
+  };
+  await getDatabase()
+    .ref(`${INSTALL_METRICS_PATH}/grants/${dayKey}/${grantId}`)
+    .set(grant);
+
+  const cleanupDate = new Date(now);
+  cleanupDate.setUTCDate(cleanupDate.getUTCDate() - 4);
+  const { dayKey: cleanupDay } = utcWindowKeys(cleanupDate);
+  try {
+    await cleanupInstallGrants(cleanupDay);
+  } catch (error) {
+    logger.warn("Install-grant cleanup deferred", error);
+  }
+
+  return grantId;
+}
+
+async function cleanupInstallGrants(lastExpiredDay) {
+  const grantsRef = getDatabase().ref(`${INSTALL_METRICS_PATH}/grants`);
+  const stale = await grantsRef.orderByKey().endAt(lastExpiredDay).once("value");
+  if (!stale.exists()) return;
+  const updates = {};
+  stale.forEach((child) => {
+    updates[child.key] = null;
+  });
+  await grantsRef.update(updates);
+}
+
+function requireReportField(value, name, pattern) {
+  if (typeof value !== "string") {
+    throw new HttpsError("invalid-argument", `${name} is required.`);
+  }
+  const normalized = value.trim();
+  if (!pattern.test(normalized)) {
+    throw new HttpsError("invalid-argument", `${name} is invalid.`);
+  }
+  return normalized;
+}
+
 async function createSignedFiles(bucket, expiresAt) {
   const entries = await Promise.all(
     Object.entries(FIRMWARE_OBJECTS).map(async ([key, objectName]) => {
@@ -196,6 +255,12 @@ export const getFirmwareRelease = onCall(
 
     try {
       const files = await createSignedFiles(bucket, expiresAt);
+      const grantId = await createInstallGrant(
+        installer,
+        release,
+        now,
+        expiresAt
+      );
       logger.info("Protected firmware release issued", {
         uid: installer.uid,
         email: installer.email,
@@ -206,6 +271,7 @@ export const getFirmwareRelease = onCall(
       return {
         ...release,
         files,
+        grantId,
         expiresAt: expiresAt.toISOString(),
         remaining
       };
@@ -216,5 +282,105 @@ export const getFirmwareRelease = onCall(
         "Secure firmware access could not be prepared. Contact the operator."
       );
     }
+  }
+);
+
+export const recordFirmwareInstall = onCall(
+  {
+    region: REGION,
+    cors: ["https://admepls.github.io", /^http:\/\/localhost(?::\d+)?$/],
+    memory: "256MiB",
+    timeoutSeconds: 30,
+    minInstances: 0,
+    maxInstances: 2,
+    concurrency: 10,
+    invoker: "public",
+    enforceAppCheck: false
+  },
+  async (request) => {
+    const installer = requireApprovedInstaller(request);
+    const data = request.data && typeof request.data === "object"
+      ? request.data
+      : {};
+    const grantId = requireReportField(
+      data.grantId,
+      "grantId",
+      /^\d{8}-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    );
+    const attemptId = requireReportField(
+      data.attemptId,
+      "attemptId",
+      /^[a-z0-9-]{12,80}$/i
+    );
+    const operation = requireReportField(
+      data.operation,
+      "operation",
+      /^(full-install|firmware-update)$/
+    );
+    const grantDayKey = grantId.slice(0, 8);
+    const nowMs = Date.now();
+    const { dayKey: successDayKey } = utcWindowKeys(new Date(nowMs));
+    let decision = null;
+
+    const transaction = await getDatabase()
+      .ref(INSTALL_METRICS_PATH)
+      .transaction(
+        (current) => {
+          decision = applySuccessfulInstall(current, {
+            grantDayKey,
+            successDayKey,
+            grantId,
+            uidKey: installerUidKey(installer.uid),
+            attemptId,
+            operation,
+            nowMs,
+            maxSuccessesPerGrant: MAX_SUCCESSES_PER_GRANT
+          });
+          return decision.accepted ? decision.state : undefined;
+        },
+        undefined,
+        false
+      );
+
+    if (!decision?.accepted) {
+      const reason = decision?.reason || "transaction-aborted";
+      if (reason === "grant-owner-mismatch") {
+        throw new HttpsError(
+          "permission-denied",
+          "This installation grant belongs to another account."
+        );
+      }
+      if (reason === "grant-limit") {
+        throw new HttpsError(
+          "resource-exhausted",
+          "This installation grant has reached its reporting limit."
+        );
+      }
+      throw new HttpsError(
+        "failed-precondition",
+        "This installation grant is missing or expired."
+      );
+    }
+    if (!transaction.committed) {
+      throw new HttpsError(
+        "aborted",
+        "The successful installation could not be recorded. Try again."
+      );
+    }
+
+    logger.info("Successful firmware operation recorded", {
+      uid: installer.uid,
+      email: installer.email,
+      grantId,
+      attemptId,
+      operation,
+      duplicate: Boolean(decision.duplicate),
+      counts: decision.counts
+    });
+    return {
+      status: true,
+      duplicate: Boolean(decision.duplicate),
+      counts: decision.counts
+    };
   }
 );
