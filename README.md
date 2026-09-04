@@ -7,8 +7,9 @@ https://admepls.github.io/DMI-HS/
 ```
 
 The page requires Firebase Google sign-in. An approved user must explicitly
-prepare the installer before either flash button is enabled. A callable backend
-checks the account and rate limits, then issues short-lived Cloud Storage URLs.
+prepare the installer before the full-install button is enabled. A callable
+backend checks the account and rate limits, then issues short-lived Cloud
+Storage URLs.
 
 ## Protection model
 
@@ -25,13 +26,12 @@ private files through its service account. Rate-limit counters are stored under
 `firmwareInstallerRateLimits` in the existing locked Realtime Database and old
 counter windows are removed automatically.
 
-Successful flashes are counted separately from installer preparations. The
-authenticated backend writes these counters under
+Successful full installations are counted separately from installer
+preparations. The authenticated backend writes these counters under
 `firmwareInstallerInstallMetrics`:
 
 ```text
 totals/fullInstall
-totals/firmwareUpdate
 totals/total
 daily/YYYYMMDD/...
 versions/VERSION/...
@@ -173,12 +173,12 @@ all release requests will be rejected.
 Commit and push the website and functions source. After GitHub Pages refreshes:
 
 1. Open the installer in desktop Chrome or Edge.
-2. Confirm both flash buttons are disabled.
+2. Confirm the full-install button is disabled.
 3. Sign in with an approved Google account.
 4. Click **Prepare secure installer**.
 5. Confirm the release card shows a short expiration countdown.
 6. Test full installation on a spare ESP32.
-7. Test firmware update without erasing a configured controller.
+7. Confirm the installer reports completion and the ESP32 restarts normally.
 
 ## Usage safeguards and limitations
 

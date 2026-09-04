@@ -23,10 +23,7 @@ const releasePublished = document.getElementById("release-published");
 const releaseState = document.getElementById("release-state");
 const operations = document.getElementById("operations");
 const fullInstaller = document.getElementById("full-install-button");
-const updateInstaller = document.getElementById("firmware-update-button");
 const fullAction = fullInstaller?.querySelector('[slot="activate"]');
-const updateAction = updateInstaller?.querySelector('[slot="activate"]');
-const updateConfirm = document.getElementById("update-confirm");
 const signedOutControls = document.getElementById("signed-out-controls");
 const signedInControls = document.getElementById("signed-in-controls");
 const signInButton = document.getElementById("sign-in-button");
@@ -307,17 +304,11 @@ function createInstallerManifest(release, parts) {
 function clearInstallerManifests() {
   generatedManifestUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
   if (fullInstaller) fullInstaller.manifest = "";
-  if (updateInstaller) updateInstaller.manifest = "";
   fullInstaller?.removeAttribute("manifest");
-  updateInstaller?.removeAttribute("manifest");
 }
 
 function syncFlashActions() {
   if (fullAction) fullAction.disabled = !releaseIsReady;
-  if (updateConfirm) updateConfirm.disabled = !releaseIsReady;
-  if (updateAction) {
-    updateAction.disabled = !(releaseIsReady && updateConfirm?.checked);
-  }
 }
 
 function lockRelease(message, stateText = "Access locked") {
@@ -447,12 +438,8 @@ async function prepareInstaller() {
       { path: release.files.partitions, offset: 0x8000 },
       { path: release.files.firmware, offset: 0x20000 }
     ]);
-    const updateManifestUrl = createInstallerManifest(release, [
-      { path: release.files.firmware, offset: 0x20000 }
-    ]);
 
     if (fullInstaller) fullInstaller.manifest = fullManifestUrl;
-    if (updateInstaller) updateInstaller.manifest = updateManifestUrl;
     preparedReleaseContext = {
       grantId: release.grantId,
       version: release.version
@@ -517,9 +504,7 @@ onAuthStateChanged(auth, (user) => {
 signInButton?.addEventListener("click", signIn);
 signOutButton?.addEventListener("click", signOutCurrentUser);
 prepareButton?.addEventListener("click", prepareInstaller);
-updateConfirm?.addEventListener("change", syncFlashActions);
 fullAction?.addEventListener("click", () => armInstallAttempt("full-install"));
-updateAction?.addEventListener("click", () => armInstallAttempt("firmware-update"));
 window.addEventListener("beforeunload", clearInstallerManifests);
 
 showBrowserWarning();
