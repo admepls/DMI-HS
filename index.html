@@ -10,7 +10,7 @@
     >
     <title>DMI-HS ESP32 Installer</title>
     <link rel="icon" href="assets/favicon.png">
-    <link rel="stylesheet" href="styles.css?v=2">
+    <link rel="stylesheet" href="styles.css?v=3">
     <script
       type="module"
       src="https://unpkg.com/esp-web-tools@10.1.0/dist/web/install-button.js?module"
@@ -155,9 +155,39 @@
         </ol>
       </section>
 
-      <footer>
-        Firmware is loaded from the configured Firebase release. This page does
-        not enable Secure Boot, Flash Encryption, or modify security eFuses.
+      <footer class="site-footer">
+        <div class="footer-attribution">
+          <p class="eyebrow">Project attribution</p>
+          <p>
+            <strong>DMI-HS</strong> is based on the open-source
+            <a
+              href="https://github.com/ivanalayan15/JuanFi"
+              target="_blank"
+              rel="noopener noreferrer"
+            >JuanFi project</a>
+            by Ivan Julius Alayan, available under the
+            <a
+              href="https://www.apache.org/licenses/LICENSE-2.0"
+              target="_blank"
+              rel="noopener noreferrer"
+            >Apache License 2.0</a>.
+          </p>
+        </div>
+        <div class="footer-details">
+          <p>
+            Installer powered by
+            <a
+              href="https://github.com/esphome/esp-web-tools"
+              target="_blank"
+              rel="noopener noreferrer"
+            >ESP Web Tools</a>.
+          </p>
+          <p>
+            This installer does not enable Secure Boot, Flash Encryption, or
+            modify security eFuses.
+          </p>
+          <p class="footer-copyright">© 2026 DMI-HS.</p>
+        </div>
       </footer>
     </main>
   </body>
