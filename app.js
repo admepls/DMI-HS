@@ -165,7 +165,10 @@ function syncFlashActions() {
 function lockRelease(message, stateText = "Access locked") {
   releaseIsReady = false;
   accessExpiresAt = 0;
-  clearInstallerManifests();
+  // ESP Web Tools can read its manifest again while completing/closing a
+  // successful installation. Keep the local blob URLs alive until a new
+  // release replaces them or this page unloads. The flash actions are disabled
+  // below, and the Storage URLs inside the manifest still expire server-side.
   operations?.classList.add("operations-locked");
   if (releaseState) {
     releaseState.textContent = stateText;
