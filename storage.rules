@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Firmware is private. The callable backend uses Admin/IAM access and
+    // returns short-lived signed URLs only after authentication and quotas.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

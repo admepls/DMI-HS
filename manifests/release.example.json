@@ -1,9 +1,0 @@
-{
-  "version": "2026.09.01",
-  "published": "2026-09-01",
-  "files": {
-    "bootloader": "https://dmi-hs.web.app/firmware/2026.09.01/bootloader.bin",
-    "partitions": "https://dmi-hs.web.app/firmware/2026.09.01/partitions.bin",
-    "firmware": "https://dmi-hs.web.app/firmware/2026.09.01/firmware.bin"
-  }
-}

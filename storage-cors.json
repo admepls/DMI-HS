@@ -1,0 +1,13 @@
+[
+  {
+    "origin": ["https://admepls.github.io"],
+    "method": ["GET", "HEAD"],
+    "responseHeader": [
+      "Content-Type",
+      "Content-Length",
+      "ETag",
+      "Cache-Control"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

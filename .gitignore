@@ -26,3 +26,8 @@ firebase-adminsdk*.json
 credentials*.json
 secret*.json
 secrets*.json
+
+# Firebase Functions runtime configuration stays local.
+functions/.env*
+!functions/.env.example
+functions/node_modules/

@@ -22,6 +22,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   background: var(--bg);
 }
@@ -230,6 +234,180 @@ h2 {
   color: var(--red);
 }
 
+.access-gate {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) minmax(290px, 0.82fr);
+  gap: 24px;
+  align-items: stretch;
+  margin-bottom: 24px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background:
+    linear-gradient(112deg, rgba(120, 213, 213, 0.07), transparent 42%),
+    rgba(17, 25, 28, 0.94);
+  box-shadow: 0 18px 48px var(--shadow);
+}
+
+.access-rail {
+  display: grid;
+  grid-template-rows: 1fr 34px;
+  place-items: center;
+  border-right: 1px solid rgba(120, 213, 213, 0.25);
+  background: rgba(8, 127, 131, 0.14);
+}
+
+.access-rail span {
+  color: var(--teal);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.access-rail i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--teal);
+  box-shadow: 0 0 0 5px rgba(120, 213, 213, 0.1), 0 0 18px var(--teal);
+}
+
+.access-copy,
+.access-controls {
+  padding: 24px 0;
+}
+
+.access-copy h2 {
+  margin: 6px 0 10px;
+  font-size: clamp(1.35rem, 2.5vw, 1.8rem);
+}
+
+.access-copy > p:last-child {
+  max-width: 520px;
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.access-controls {
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  padding-right: 24px;
+}
+
+.signed-in-controls {
+  display: grid;
+  gap: 14px;
+}
+
+.identity-badge {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.identity-badge > span:last-child {
+  display: grid;
+  min-width: 0;
+}
+
+.identity-badge strong,
+.identity-badge small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity-badge strong {
+  font-size: 0.9rem;
+}
+
+.identity-badge small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.identity-mark {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(120, 213, 213, 0.42);
+  border-radius: 10px;
+  background: rgba(8, 127, 131, 0.18);
+  color: var(--teal);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-weight: 800;
+}
+
+.auth-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.auth-button {
+  min-height: 44px;
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 800;
+  transition: border-color 140ms ease, filter 140ms ease, transform 140ms ease;
+}
+
+.auth-button-primary {
+  width: 100%;
+  background: var(--teal);
+  color: #041416;
+}
+
+.auth-button-quiet {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--muted);
+}
+
+.auth-button:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.auth-button:disabled {
+  cursor: wait;
+  filter: grayscale(0.5);
+  opacity: 0.55;
+}
+
+.access-status {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 0.71rem;
+  line-height: 1.45;
+}
+
+.access-status[data-kind="ready"] {
+  color: var(--teal);
+}
+
+.access-status[data-kind="error"] {
+  color: var(--red);
+}
+
+.operations-locked .operation {
+  border-color: rgba(42, 58, 62, 0.7);
+  opacity: 0.58;
+}
+
 .operations {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -378,7 +556,8 @@ code {
 
 .action:focus-visible,
 .confirmation input:focus-visible,
-.source-link:focus-visible {
+.source-link:focus-visible,
+.auth-button:focus-visible {
   outline: 3px solid var(--blue);
   outline-offset: 3px;
 }
@@ -445,6 +624,19 @@ footer {
     grid-template-columns: 1fr;
   }
 
+  .access-gate {
+    grid-template-columns: 44px 1fr;
+  }
+
+  .access-controls {
+    grid-column: 2;
+    padding: 0 22px 22px 0;
+  }
+
+  .access-copy {
+    padding: 22px 22px 0 0;
+  }
+
   .hero {
     gap: 26px;
     padding-top: 44px;
@@ -479,17 +671,28 @@ footer {
   }
 
   h1 {
-    font-size: clamp(2.8rem, 16vw, 4.2rem);
+    font-size: clamp(2.75rem, 13.5vw, 3.3rem);
+    overflow-wrap: anywhere;
   }
 
   .operation {
     padding: 22px;
     border-radius: 14px;
   }
+
+  .access-gate {
+    grid-template-columns: 34px 1fr;
+    gap: 16px;
+  }
+
+  .auth-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .action {
+  .action,
+  .auth-button {
     transition: none;
   }
 }
