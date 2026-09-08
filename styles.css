@@ -1010,6 +1010,75 @@ dt {
   box-shadow: 0 12px 32px rgba(255, 185, 92, 0.15), inset 0 1px rgba(255, 255, 255, 0.45);
 }
 
+.asset-download {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 0.62fr);
+  gap: 28px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 22px 30px;
+  border: 1px solid rgba(102, 229, 255, 0.2);
+  border-radius: 20px;
+  background: linear-gradient(112deg, rgba(102, 229, 255, 0.075), transparent 38%), rgba(10, 18, 31, 0.66);
+  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.26), inset 0 1px rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+.asset-download .operation-label {
+  color: var(--teal);
+}
+
+.asset-download h2 {
+  margin: 7px 0 6px;
+}
+
+.asset-download-copy > p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.action-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px solid rgba(102, 229, 255, 0.38);
+  background: linear-gradient(112deg, rgba(102, 229, 255, 0.17), rgba(127, 188, 255, 0.1));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+  text-align: left;
+  text-decoration: none;
+}
+
+.action-download svg {
+  flex: 0 0 auto;
+  fill: none;
+  stroke: var(--teal);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.action-download span {
+  display: grid;
+  gap: 2px;
+}
+
+.action-download strong {
+  font-size: 0.94rem;
+}
+
+.action-download small {
+  color: var(--muted);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 0.67rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
 .steps {
   margin-top: 24px;
   padding: 30px;
@@ -1064,6 +1133,10 @@ dt {
   .operation {
     grid-template-columns: 1fr;
   }
+
+  .asset-download {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 520px) {
@@ -1100,6 +1173,7 @@ dt {
   .release-card,
   .access-gate,
   .operation,
+  .asset-download,
   .steps {
     border-radius: 18px;
   }
@@ -1118,6 +1192,7 @@ dt {
   }
 
   .operation,
+  .asset-download,
   .steps {
     padding: 22px;
   }
@@ -1129,6 +1204,7 @@ dt {
   .access-gate,
   .notice,
   .operation,
+  .asset-download,
   .steps {
     background-color: #111b2c;
   }
