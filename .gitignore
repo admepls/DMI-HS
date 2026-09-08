@@ -31,3 +31,6 @@ secrets*.json
 functions/.env*
 !functions/.env.example
 functions/node_modules/
+
+# Local output produced by the GitHub Pages staging step.
+_site/

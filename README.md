@@ -1,9 +1,10 @@
-# DMI-HS protected ESP32 installer
+# JFI+ protected ESP32 installer
 
-GitHub Pages installer for standard, non-encrypted DMI-HS ESP32 firmware:
+GitHub Pages installer for standard, non-encrypted JFI+ ESP32 firmware. The
+installed firmware is configured and managed using the DMI-HS app:
 
 ```text
-https://admepls.github.io/DMI-HS/
+https://admepls.github.io/JFI/
 ```
 
 The page requires Firebase Google sign-in. An approved user must explicitly
@@ -66,7 +67,7 @@ firmware.bin
 release.json
 ```
 
-The three binaries must come from the same standard DMI-HS build:
+The three binaries must come from the same standard JFI+ build:
 
 ```powershell
 pio run -e HS
@@ -86,7 +87,7 @@ In Firebase Console for project `dmi-hs`:
 1. Open **Authentication > Sign-in method**.
 2. Enable **Google** and select a support email.
 3. Open **Authentication > Settings > Authorized domains**.
-4. Add `admepls.github.io` without `https://` or `/DMI-HS/`.
+4. Add `admepls.github.io` without `https://` or `/JFI/`.
 
 The web Firebase configuration is already present in [config.js](config.js).
 Firebase web API keys are identifiers, not administrator credentials; Storage
@@ -170,7 +171,9 @@ all release requests will be rejected.
 
 ## 7. Publish GitHub Pages
 
-Commit and push the website and functions source. After GitHub Pages refreshes:
+Push the website and functions source to the `main` branch. The included GitHub
+Pages workflow publishes only the browser-facing installer files. After the
+deployment finishes:
 
 1. Open the installer in desktop Chrome or Edge.
 2. Confirm the full-install button is disabled.

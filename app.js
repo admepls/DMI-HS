@@ -14,7 +14,7 @@ import {
   ReCaptchaEnterpriseProvider,
   initializeAppCheck
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app-check.js";
-import { DMI_HS_UPDATER_CONFIG as config } from "./config.js";
+import { JFI_PLUS_UPDATER_CONFIG as config } from "./config.js";
 
 const browserNotice = document.getElementById("browser-notice");
 const releaseError = document.getElementById("release-error");
@@ -281,7 +281,7 @@ if (document.body) {
 
 function createInstallerManifest(release, parts) {
   const manifest = {
-    name: "DMI-HS",
+    name: "JFI+",
     version: release.version,
     new_install_prompt_erase: true,
     new_install_improv_wait_time: 0,

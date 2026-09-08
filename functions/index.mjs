@@ -77,7 +77,7 @@ function requireApprovedInstaller(request) {
     });
     throw new HttpsError(
       "permission-denied",
-      "This account is not approved to install DMI-HS firmware."
+      "This account is not approved to install JFI+ firmware."
     );
   }
 

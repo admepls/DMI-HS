@@ -1,4 +1,6 @@
-export const DMI_HS_UPDATER_CONFIG = Object.freeze({
+// JFI+ uses the existing DMI-HS Firebase backend so approved accounts,
+// protected releases, quotas, and installation metrics remain compatible.
+export const JFI_PLUS_UPDATER_CONFIG = Object.freeze({
   firebase: Object.freeze({
     apiKey: "AIzaSyCH9HUM8OKueyyF-LcluFn56_37nd7cdVA",
     authDomain: "dmi-hs.firebaseapp.com",
