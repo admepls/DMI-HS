@@ -14,7 +14,7 @@ import {
   ReCaptchaEnterpriseProvider,
   initializeAppCheck
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app-check.js";
-import { DMI_HS_UPDATER_CONFIG as config } from "./config.js?v=5";
+import { DMI_HS_UPDATER_CONFIG as config } from "./config.js?v=6";
 
 const browserNotice = document.getElementById("browser-notice");
 const releaseError = document.getElementById("release-error");
@@ -33,12 +33,21 @@ const identityMark = document.getElementById("identity-mark");
 const identityName = document.getElementById("identity-name");
 const identityEmail = document.getElementById("identity-email");
 const accessStatus = document.getElementById("access-status");
+const authStep = document.getElementById("step-auth");
+const connectStep = document.getElementById("step-connect");
+const flashStep = document.getElementById("step-flash");
+const authStepState = document.getElementById("step-auth-state");
+const connectStepState = document.getElementById("step-connect-state");
+const flashStepState = document.getElementById("step-flash-state");
+const flashProtocol = document.getElementById("flash-protocol");
+const flashProtocolStatus = document.getElementById("flash-protocol-status");
 
 let currentUser = null;
 let releaseIsReady = false;
 let accessExpiresAt = 0;
 let prepareRetryAt = 0;
 let authBusy = false;
+let flashPhase = "idle";
 const generatedManifestUrls = [];
 
 const firebaseApp = initializeApp(config.firebase);
@@ -73,6 +82,71 @@ function setAccessStatus(message, kind = "neutral") {
   if (!accessStatus) return;
   accessStatus.textContent = message;
   accessStatus.dataset.kind = kind;
+}
+
+function setStepState(step, stateElement, mode, label) {
+  if (!step) return;
+  step.classList.remove("is-active", "is-complete", "is-locked", "is-error");
+  step.classList.add(`is-${mode}`);
+  if (stateElement) stateElement.textContent = label;
+}
+
+function syncWorkflowState() {
+  if (flashPhase === "complete") {
+    setStepState(authStep, authStepState, "complete", "Access verified");
+    setStepState(connectStep, connectStepState, "complete", "Board connected");
+    setStepState(flashStep, flashStepState, "complete", "Installation complete");
+    return;
+  }
+  if (flashPhase === "error") {
+    setStepState(authStep, authStepState, "complete", "Access verified");
+    setStepState(connectStep, connectStepState, "complete", "Board connected");
+    setStepState(flashStep, flashStepState, "error", "Installer stopped");
+    return;
+  }
+  if (flashPhase === "armed" || flashPhase === "live") {
+    setStepState(authStep, authStepState, "complete", "Access verified");
+    setStepState(connectStep, connectStepState, "complete", "Board selected");
+    setStepState(
+      flashStep,
+      flashStepState,
+      "active",
+      flashPhase === "live" ? "Flashing in progress" : "Installer opening"
+    );
+    return;
+  }
+
+  if (!releaseIsReady) {
+    setStepState(
+      authStep,
+      authStepState,
+      currentUser ? "complete" : "active",
+      currentUser ? "Account approved" : "Sign in required"
+    );
+    setStepState(
+      connectStep,
+      connectStepState,
+      currentUser ? "active" : "locked",
+      currentUser ? "Prepare firmware" : "Complete step 1"
+    );
+    setStepState(flashStep, flashStepState, "locked", "Waiting for connection");
+    return;
+  }
+
+  setStepState(authStep, authStepState, "complete", "Access ready");
+
+  setStepState(connectStep, connectStepState, "active", "Ready to connect");
+  setStepState(flashStep, flashStepState, "locked", "Waiting for connection");
+}
+
+function setFlashPhase(phase, message) {
+  flashPhase = phase;
+  if (flashProtocol) {
+    flashProtocol.classList.toggle("is-live", phase === "armed" || phase === "live");
+    flashProtocol.classList.toggle("is-complete", phase === "complete");
+  }
+  if (flashProtocolStatus && message) flashProtocolStatus.textContent = message;
+  syncWorkflowState();
 }
 
 function hideReleaseError() {
@@ -185,6 +259,7 @@ function queueSuccessfulInstall(attempt) {
     ...readPendingInstallReports(),
     { ...attempt, finishedAtMs: Date.now() }
   ]);
+  setFlashPhase("complete", "Installation complete. DMI-HS is ready on this ESP32.");
   setAccessStatus("Installation succeeded. Recording the result...", "ready");
   void flushPendingInstallReports();
 }
@@ -239,6 +314,10 @@ function armInstallAttempt(operation) {
     uid: currentUser.uid,
     version: preparedReleaseContext.version
   };
+  setFlashPhase(
+    "armed",
+    "Installer opening. Select the correct COM port, then follow the BOOT sequence."
+  );
 }
 
 function watchInstallDialog(dialog) {
@@ -251,13 +330,39 @@ function watchInstallDialog(dialog) {
 
   let finished = false;
   let pollId = 0;
+  let lastState = "";
+  setFlashPhase("live", "Hold BOOT and tap RESET/EN when preparation begins.");
   const inspect = () => {
     const state = dialog._installState?.state;
-    if (state === "finished" && !finished) {
+    const normalizedState = typeof state === "string" ? state.toLowerCase() : "";
+    if (normalizedState && normalizedState !== lastState) {
+      lastState = normalizedState;
+      if (normalizedState.includes("eras")) {
+        setFlashPhase("live", "Erasing started. Release BOOT and keep USB connected.");
+      } else if (
+        normalizedState.includes("writ") ||
+        normalizedState.includes("install") ||
+        normalizedState.includes("flash")
+      ) {
+        setFlashPhase("live", "Writing DMI-HS. Keep the USB cable connected.");
+      } else if (
+        normalizedState.includes("prepar") ||
+        normalizedState.includes("connect") ||
+        normalizedState.includes("initial")
+      ) {
+        setFlashPhase("live", "Hold BOOT and tap RESET/EN now.");
+      }
+    }
+    if (normalizedState === "finished" && !finished) {
       finished = true;
       queueSuccessfulInstall(attempt);
     }
-    if (state === "finished" || state === "error" || !dialog.isConnected) {
+    if (normalizedState === "error") {
+      setFlashPhase("error", "Installation stopped. Keep the board connected and try again.");
+    } else if (!dialog.isConnected && normalizedState !== "finished") {
+      setFlashPhase("idle", "The installer closed. Connect again when you are ready.");
+    }
+    if (normalizedState === "finished" || normalizedState === "error" || !dialog.isConnected) {
       clearInterval(pollId);
     }
   };
@@ -309,11 +414,15 @@ function clearInstallerManifests() {
 
 function syncFlashActions() {
   if (fullAction) fullAction.disabled = !releaseIsReady;
+  syncWorkflowState();
 }
 
 function lockRelease(message, stateText = "Access locked") {
   releaseIsReady = false;
   accessExpiresAt = 0;
+  if (flashPhase !== "live") {
+    setFlashPhase("idle", "The BOOT sequence activates when the installer opens.");
+  }
   // ESP Web Tools can read its manifest again while completing/closing a
   // successful installation. Keep the local blob URLs alive until a new
   // release replaces them or this page unloads. The flash actions are disabled
@@ -354,7 +463,7 @@ function refreshAccessClock() {
   } else {
     prepareRetryAt = 0;
     prepareButton.disabled = false;
-    prepareButton.textContent = "Prepare secure installer";
+    prepareButton.textContent = "Prepare protected firmware";
   }
 }
 
@@ -362,6 +471,7 @@ function setAuthBusy(busy) {
   authBusy = busy;
   if (signInButton) signInButton.disabled = busy;
   if (signOutButton) signOutButton.disabled = busy;
+  if (prepareButton && busy) prepareButton.disabled = true;
   refreshAccessClock();
 }
 
@@ -463,6 +573,7 @@ async function prepareInstaller() {
     refreshAccessClock();
   } catch (error) {
     lockRelease("", "Access denied");
+    if (releaseState) releaseState.classList.add("failed");
     const message = describeFirebaseError(error);
     setAccessStatus(message, "error");
     showReleaseError(message);
@@ -487,7 +598,7 @@ onAuthStateChanged(auth, (user) => {
     if (identityEmail) identityEmail.textContent = user.email || "Verified Firebase user";
     if (identityMark) identityMark.textContent = name.trim().charAt(0).toUpperCase() || "A";
     if (releaseState) releaseState.textContent = "Access locked";
-    setAccessStatus("Signed in. Prepare the installer when the ESP32 is connected.");
+    setAccessStatus("Account approved. Continue to step 2 to prepare the firmware.", "ready");
     void flushPendingInstallReports();
   } else {
     if (signedOutControls) signedOutControls.hidden = false;
@@ -495,10 +606,15 @@ onAuthStateChanged(auth, (user) => {
     if (releaseVersion) releaseVersion.textContent = "Protected";
     if (releasePublished) releasePublished.textContent = "—";
     if (releaseState) releaseState.textContent = "Sign in required";
+    if (prepareButton) {
+      prepareButton.disabled = true;
+      prepareButton.textContent = "Prepare protected firmware";
+    }
     setAccessStatus("Authentication is required before flashing.");
   }
   setAuthBusy(false);
   refreshAccessClock();
+  syncWorkflowState();
 });
 
 signInButton?.addEventListener("click", signIn);
@@ -509,5 +625,6 @@ window.addEventListener("beforeunload", clearInstallerManifests);
 
 showBrowserWarning();
 syncFlashActions();
+syncWorkflowState();
 setInterval(refreshAccessClock, 1000);
 setInterval(() => void flushPendingInstallReports(), 30000);

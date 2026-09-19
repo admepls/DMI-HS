@@ -1,225 +1,316 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#060a12">
+    <meta name="theme-color" content="#0f172a">
     <meta
       name="description"
-      content="Install DMI-HS firmware on a standard ESP32 from Chrome or Edge."
+      content="Install protected DMI-HS firmware on a standard ESP32 from desktop Chrome or Edge."
     >
     <title>DMI-HS ESP32 Installer</title>
     <link rel="icon" href="assets/favicon.png">
-    <link rel="stylesheet" href="styles.css?v=5">
+    <link rel="stylesheet" href="styles.css?v=6">
     <script
       type="module"
       src="https://unpkg.com/esp-web-tools@10.1.0/dist/web/install-button.js?module"
     ></script>
-    <script type="module" src="app.js?v=5"></script>
+    <script type="module" src="app.js?v=6"></script>
   </head>
   <body>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
     <main class="shell">
       <header class="brandbar">
         <a class="brand" href="./" aria-label="DMI-HS installer home">
           <img src="assets/logo.png" alt="">
           <span>
             <strong>DMI-HS</strong>
-            <small>ESP32 firmware installer</small>
+            <small>ESP32 installation console</small>
           </span>
         </a>
-        <span class="source-link">Protected release</span>
+        <span class="source-chip">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M12 3 5 6v5c0 4.7 2.9 8.9 7 10 4.1-1.1 7-5.3 7-10V6l-7-3Z" />
+            <path d="m9 12 2 2 4-4" />
+          </svg>
+          Protected release
+        </span>
       </header>
 
       <section class="hero" aria-labelledby="page-title">
         <div class="hero-copy">
-          <p class="eyebrow">ESP32 · no encryption · DMI-HS</p>
-          <h1 id="page-title">DMI-HS</h1>
+          <p class="eyebrow">DMI-HS &middot; ESP32 &middot; 4 MB</p>
+          <h1 id="page-title">Flash with a clear signal.</h1>
           <p class="hero-lede">
-
-      
+            Authenticate, connect, and install. The console unlocks each step
+            only when the board and protected release are ready.
           </p>
         </div>
-        <dl class="release-card" aria-label="Available release">
+
+        <dl class="release-card" aria-labelledby="release-card-title">
+          <div class="release-card-heading">
+            <span class="release-pulse" aria-hidden="true"></span>
+            <span id="release-card-title">Release channel</span>
+          </div>
           <div>
             <dt>Release</dt>
             <dd id="release-version">Protected</dd>
           </div>
           <div>
             <dt>Published</dt>
-            <dd id="release-published">—</dd>
+            <dd id="release-published">&mdash;</dd>
           </div>
           <div>
             <dt>Target</dt>
-            <dd>ESP32 · 4 MB</dd>
+            <dd>ESP32 / 4 MB</dd>
           </div>
           <div class="release-state" id="release-state">Sign in required</div>
         </dl>
       </section>
 
-      <section class="access-gate" aria-label="Firmware access">
-        <div class="access-rail" aria-hidden="true">
-          <span>AUTH</span>
-          <i></i>
-        </div>
-        <div class="access-copy">
-          <p class="eyebrow">Installer checkpoint</p>
-          <h2>Unlock the release.</h2>
-          <p>
-            Firmware links are issued only when you prepare the installer and
-            expire after a few minutes.
-          </p>
-        </div>
-        <div class="access-controls">
-          <div id="signed-out-controls">
-            <button class="auth-button auth-button-primary" id="sign-in-button" type="button">
-              Continue with Google
-            </button>
+      <section class="workflow" aria-labelledby="workflow-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Installation path</p>
+            <h2 id="workflow-title">Three steps. One safe flash.</h2>
           </div>
-          <div class="signed-in-controls" id="signed-in-controls" hidden>
-            <div class="identity-badge">
-              <span class="identity-mark" id="identity-mark" aria-hidden="true">A</span>
-              <span>
-                <strong id="identity-name">Approved account</strong>
-                <small id="identity-email"></small>
-              </span>
+          <p>Complete the active step to energize the next stage.</p>
+        </div>
+
+        <ol class="workflow-grid">
+          <li class="workflow-step is-active" id="step-auth">
+            <div class="step-index" aria-hidden="true">01</div>
+            <div class="step-body">
+              <header class="step-heading">
+                <div>
+                  <p class="step-kicker">Authenticate</p>
+                  <h3>Unlock the release</h3>
+                </div>
+                <span class="step-state" id="step-auth-state">Sign in required</span>
+              </header>
+              <p class="step-copy">
+                Sign in with an approved Google account to unlock the protected
+                installation controls.
+              </p>
+
+              <div class="auth-panel">
+                <div id="signed-out-controls">
+                  <button class="auth-button auth-button-primary" id="sign-in-button" type="button">
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path d="M21.35 12.2c0-.7-.06-1.2-.2-1.75H12v3.3h5.37a4.6 4.6 0 0 1-2 3v2.15h3.23c1.9-1.75 2.75-4.32 2.75-6.7Z" />
+                      <path d="M12 21.7c2.7 0 4.97-.9 6.62-2.43l-3.23-2.15c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.05v2.22A10 10 0 0 0 12 21.7Z" />
+                      <path d="M6.39 13.95a6 6 0 0 1 0-3.84V7.9H3.05a10 10 0 0 0 0 8.28l3.34-2.22Z" />
+                      <path d="M12 5.97c1.47 0 2.78.5 3.81 1.49l2.88-2.88A9.65 9.65 0 0 0 12 1.95 10 10 0 0 0 3.05 7.9l3.34 2.21C7.18 7.74 9.39 5.97 12 5.97Z" />
+                    </svg>
+                    <span>Continue with Google</span>
+                  </button>
+                </div>
+
+                <div class="signed-in-controls" id="signed-in-controls" hidden>
+                  <div class="identity-badge">
+                    <span class="identity-mark" id="identity-mark" aria-hidden="true">A</span>
+                    <span>
+                      <small>Approved account</small>
+                      <strong id="identity-name">Signed-in account</strong>
+                      <span id="identity-email"></span>
+                    </span>
+                  </div>
+                  <div class="auth-actions auth-actions-single">
+                    <button class="auth-button auth-button-quiet" id="sign-out-button" type="button">
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+
+                <p class="access-status" id="access-status" role="status" aria-live="polite">
+                  Authentication is required before flashing.
+                </p>
+              </div>
             </div>
-            <div class="auth-actions">
-              <button class="auth-button auth-button-primary" id="prepare-button" type="button">
-                Prepare secure installer
-              </button>
-              <button class="auth-button auth-button-quiet" id="sign-out-button" type="button">
-                Sign out
-              </button>
+          </li>
+
+          <li class="workflow-step is-locked" id="step-connect">
+            <div class="step-index" aria-hidden="true">02</div>
+            <div class="step-body">
+              <header class="step-heading">
+                <div>
+                  <p class="step-kicker">Connect</p>
+                  <h3>Select the ESP32</h3>
+                </div>
+                <span class="step-state" id="step-connect-state">Complete step 1</span>
+              </header>
+              <p class="step-copy">
+                Prepare the protected files, connect the board by USB, then
+                select its COM port when prompted.
+              </p>
+
+              <div class="connection-controls">
+              <div class="warning-banner" id="browser-notice" role="alert" hidden>
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M12 3 2.5 20h19L12 3Z" />
+                  <path d="M12 9v5m0 3h.01" />
+                </svg>
+                <span>
+                  <strong>Web Serial is unavailable.</strong>
+                  Please switch to desktop Chrome or Edge.
+                </span>
+              </div>
+
+              <div class="notice notice-error" id="release-error" hidden></div>
+
+              <div class="prepare-release">
+                <button
+                  class="auth-button auth-button-secondary"
+                  id="prepare-button"
+                  type="button"
+                  disabled
+                >
+                  Prepare protected firmware
+                </button>
+                <small>Secure download links expire after a few minutes.</small>
+              </div>
+
+              <div class="operations operations-locked" id="operations">
+                <div class="operation-copy">
+                  <p class="operation-label">Full installation</p>
+                  <p>Bootloader, partitions, and firmware will be written together.</p>
+                  <span>Existing ESP32 data will be erased.</span>
+                </div>
+                <div class="operation-action">
+                  <esp-web-install-button id="full-install-button">
+                      <button slot="activate" class="action action-install" type="button" disabled>
+                      <svg aria-hidden="true" viewBox="0 0 24 24">
+                        <path d="M8 3v4m8-4v4M7 7h10v5a5 5 0 0 1-5 5 5 5 0 0 1-5-5V7Zm5 10v4" />
+                      </svg>
+                      Connect and install
+                    </button>
+                    <span slot="unsupported" class="unsupported">
+                      Please switch to desktop Chrome or Edge.
+                    </span>
+                    <span slot="not-allowed" class="unsupported">
+                      Open this page over HTTPS or from localhost.
+                    </span>
+                  </esp-web-install-button>
+                </div>
+              </div>
+              </div>
             </div>
-          </div>
-          <p class="access-status" id="access-status" role="status" aria-live="polite">
-            Authentication is required before flashing.
-          </p>
-        </div>
-      </section>
-
-      <section class="notice notice-error" id="browser-notice" hidden>
-        Web Serial is unavailable. Open this page over HTTPS in desktop Chrome
-        or Edge.
-      </section>
-
-      <section class="notice notice-error" id="release-error" hidden></section>
-
-      <section class="operations operations-locked" id="operations" aria-label="Full installation">
-        <article class="operation operation-install">
-          <div class="operation-copy">
-            <p class="operation-label">New or replacement board</p>
-            <h2>Full installation</h2>
-            <p class="action-note">
-              Existing data on the ESP32 will be erased.
-            </p>
-          </div>
-          <div class="operation-action">
-            <esp-web-install-button id="full-install-button">
-              <button slot="activate" class="action action-install" disabled>
-                Connect and install
-              </button>
-              <span slot="unsupported" class="unsupported">
-                Use desktop Chrome or Edge.
-              </span>
-              <span slot="not-allowed" class="unsupported">
-                Open this page from HTTPS or localhost.
-              </span>
-            </esp-web-install-button>
-          </div>
-        </article>
-      </section>
-
-      <section class="asset-download" aria-labelledby="asset-download-title">
-        <div class="asset-download-copy">
-          <p class="operation-label">RouterOS companion files</p>
-          <h2 id="asset-download-title">Mikrotik Assets</h2>
-          <p>
-            Download the portal and shared rewards folders together in one archive.
-          </p>
-        </div>
-        <a
-          class="action action-download"
-          href="https://drive.google.com/uc?export=download&amp;id=1Rx5t39oPpiNlGNVY28D7UiCmziqUg7sb"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Download the HS and HS-Account assets archive from Google Drive"
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22">
-            <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" />
-          </svg>
-          <span>
-            <strong>Download assets</strong>
-            <small> Google Drive</small>
-          </span>
-        </a>
-      </section>
-
-      <section class="steps" aria-labelledby="steps-title">
-        <div>
-          <p class="eyebrow">Before connecting</p>
-          <h2 id="steps-title">Three quick steps</h2>
-        </div>
-        <ol>
-          <li>
-            <span>1</span>
-            <p>Sign in, then select <strong>Prepare secure installer</strong>.</p>
           </li>
-          <li>
-            <span>2</span>
-            <p>
-              Select <strong>Connect and install</strong>, choose the correct
-              COM port, then choose <strong>Erase</strong>.
-            </p>
-          </li>
-          <li>
-            <span>3</span>
-            <p>
-              When “Preparing installation” appears, hold
-              <strong class="boot-instruction">BOOT and tap RESET/EN</strong>.
-              Release BOOT when “Erasing” begins, then keep USB connected until
-              installation completes.
-            </p>
+
+          <li class="workflow-step is-locked" id="step-flash">
+            <div class="step-index" aria-hidden="true">03</div>
+            <div class="step-body">
+              <header class="step-heading">
+                <div>
+                  <p class="step-kicker">Flash protocol</p>
+                  <h3>Enter download mode</h3>
+                </div>
+                <span class="step-state" id="step-flash-state">Waiting for connection</span>
+              </header>
+
+              <div class="flash-protocol" id="flash-protocol">
+                <div class="board-visual" aria-hidden="true">
+                  <span class="board-port"></span>
+                  <span class="board-chip">ESP32</span>
+                  <span class="board-led"></span>
+                  <span class="board-trace trace-one"></span>
+                  <span class="board-trace trace-two"></span>
+                  <span class="board-button board-button-boot">BOOT</span>
+                  <span class="board-button board-button-reset">RESET/EN</span>
+                </div>
+                <div class="protocol-copy">
+                  <p class="protocol-status" id="flash-protocol-status" role="status" aria-live="polite">
+                    The BOOT sequence activates when the installer opens.
+                  </p>
+                  <ol class="protocol-list">
+                    <li><strong>Hold BOOT</strong> when “Preparing installation” appears.</li>
+                    <li><strong>Tap RESET/EN</strong> while continuing to hold BOOT.</li>
+                    <li><strong>Release BOOT</strong> when “Erasing” begins.</li>
+                  </ol>
+                  <p class="usb-note">Keep the USB cable connected until installation completes.</p>
+                </div>
+              </div>
+            </div>
           </li>
         </ol>
       </section>
 
+      <section class="resources" aria-labelledby="resources-title">
+        <div class="section-heading compact">
+          <div>
+            <p class="eyebrow">Companion resources</p>
+            <h2 id="resources-title">Finish the deployment.</h2>
+          </div>
+        </div>
+
+        <div class="resource-grid">
+          <article class="resource-card">
+            <div class="resource-icon drive-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48">
+                <path class="drive-green" d="M17 6h14l12 21H29Z" />
+                <path class="drive-yellow" d="M17 6 5 27l7 12 12-21Z" />
+                <path class="drive-blue" d="M12 39h24l7-12H19Z" />
+              </svg>
+            </div>
+            <div class="resource-copy">
+              <p class="resource-label">RouterOS package</p>
+              <h3>MikroTik assets</h3>
+              <p>Download the HotSpot portal and shared rewards folders as one archive.</p>
+            </div>
+            <a
+              class="resource-action"
+              href="https://drive.google.com/uc?export=download&amp;id=1Rx5t39oPpiNlGNVY28D7UiCmziqUg7sb"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Download assets
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 17 17 7m-8 0h8v8" /></svg>
+            </a>
+          </article>
+
+          <article class="resource-card resource-card-app">
+            <div class="resource-icon app-icon" aria-hidden="true">
+              <img src="assets/logo.png" alt="">
+            </div>
+            <div class="resource-copy">
+              <p class="resource-label">Android management</p>
+              <h3>DMI-HS app</h3>
+              <p>Configure controllers, manage users, and review sales from your phone.</p>
+            </div>
+            <a
+              class="resource-action"
+              href="https://play.google.com/store/apps/details?id=com.hotspot.dmi"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open on Google Play
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 17 17 7m-8 0h8v8" /></svg>
+            </a>
+            <small class="tester-note">Availability may be limited during closed testing.</small>
+          </article>
+        </div>
+      </section>
+
       <footer class="site-footer">
-        <div class="footer-attribution">
-          <p class="eyebrow">Project attribution</p>
+        <div>
+          <p class="footer-label">Installer engine</p>
           <p>
-            <strong>DMI-HS</strong> is based on the open-source
-            <a
-              href="https://github.com/ivanalayan15/JuanFi"
-              target="_blank"
-              rel="noopener noreferrer"
-            >JuanFi project</a>
-            by Ivan Julius Alayan, available under the
-            <a
-              href="https://www.apache.org/licenses/LICENSE-2.0"
-              target="_blank"
-              rel="noopener noreferrer"
-            >Apache License 2.0</a>.
+            Powered by
+            <a href="https://github.com/esphome/esp-web-tools" target="_blank" rel="noopener noreferrer">
+              ESP Web Tools
+            </a>.
           </p>
         </div>
-        <div class="footer-details">
-          <p>
-            Installer powered by
-            <a
-              href="https://github.com/esphome/esp-web-tools"
-              target="_blank"
-              rel="noopener noreferrer"
-            >ESP Web Tools</a>.
-          </p>
-          <p>
-            This installer does not enable Secure Boot, Flash Encryption, or
-            modify security eFuses.
-          </p>
-          <p>
-            Use the <strong>DMI-HS app</strong> to connect to, configure, and
-            manage the installed DMI-HS firmware.
-          </p>
-          <p class="footer-copyright">© 2026 DMI-HS.</p>
+        <div>
+          <p class="footer-label">Board security</p>
+          <p>This installer does not enable Secure Boot, Flash Encryption, or modify security eFuses.</p>
+        </div>
+        <div>
+          <p class="footer-label">DMI-HS</p>
+          <p>Standard ESP32 installer &middot; protected firmware delivery.</p>
+          <p class="footer-copyright">&copy; 2026 DMI-HS</p>
         </div>
       </footer>
     </main>
