@@ -1,5 +1,5 @@
 {
-  "name": "jfi-plus-firmware-access",
+  "name": "dmi-hs-firmware-access",
   "private": true,
   "type": "module",
   "engines": {

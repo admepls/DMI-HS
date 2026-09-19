@@ -1,4 +1,4 @@
-name: Deploy JFI+ installer to GitHub Pages
+name: Deploy DMI-HS installer to GitHub Pages
 
 on:
   push:
