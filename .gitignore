@@ -9,6 +9,7 @@ firmware/
 Thumbs.db
 .agents/
 .codex/
+/_codex_backups/
 
 # Secrets, just in case they are copied here by mistake.
 .env
