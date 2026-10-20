@@ -6,16 +6,16 @@
     <meta name="theme-color" content="#0f172a">
     <meta
       name="description"
-      content="Install protected DMI-HS firmware on a standard ESP32 from desktop Chrome or Edge."
+      content="Install protected DMI-HS firmware on ESP32-S3 N16R8 (recommended) or classic ESP32 from desktop Chrome or Edge."
     >
     <title>DMI-HS ESP32 Installer</title>
     <link rel="icon" href="assets/favicon.png">
-    <link rel="stylesheet" href="styles.css?v=6">
+    <link rel="stylesheet" href="styles.css?v=7">
     <script
       type="module"
       src="https://unpkg.com/esp-web-tools@10.1.0/dist/web/install-button.js?module"
     ></script>
-    <script type="module" src="app.js?v=6"></script>
+    <script type="module" src="app.js?v=8"></script>
   </head>
   <body>
     <div class="ambient ambient-one" aria-hidden="true"></div>
@@ -41,10 +41,17 @@
 
       <section class="hero" aria-labelledby="page-title">
         <div class="hero-copy">
-          <p class="eyebrow">DMI-HS &middot; ESP32 &middot; 4 MB</p>
+          <p class="eyebrow">DMI-HS &middot; ESP32-S3 + ESP32</p>
           <h1 id="page-title">DMI Hotspot</h1>
           <p class="hero-lede">
             Authenticate, connect, and install.
+          </p>
+          <div class="hardware-recommendation">
+            <span class="recommended-badge">Recommended hardware</span>
+            <strong>ESP32-S3 N16R8</strong>
+            <span>16 MB flash &middot; 8 MB PSRAM</span>
+            <small>More storage and memory headroom. Classic ESP32 remains supported.</small>
+          </div>
         </div>
 
         <dl class="release-card" aria-labelledby="release-card-title">
@@ -62,7 +69,7 @@
           </div>
           <div>
             <dt>Target</dt>
-            <dd>ESP32 / 4 MB</dd>
+            <dd id="release-target">Select hardware</dd>
           </div>
           <div class="release-state" id="release-state">Sign in required</div>
         </dl>
@@ -134,16 +141,28 @@
               <header class="step-heading">
                 <div>
                   <p class="step-kicker">Connect</p>
-                  <h3>Select the ESP32</h3>
+                  <h3>Select your hardware</h3>
                 </div>
                 <span class="step-state" id="step-connect-state">Complete step 1</span>
               </header>
               <p class="step-copy">
-                Prepare the protected files, connect the board by USB, then
+                Choose the matching hardware, prepare its protected files, then
+                connect the board by USB and
                 select its COM port when prompted.
               </p>
 
               <div class="connection-controls">
+              <div class="hardware-choice">
+                <label for="hardware-select">Controller hardware</label>
+                <select id="hardware-select" aria-describedby="hardware-description">
+                  <option value="">Select your board...</option>
+                  <option value="n16r8">ESP32-S3 N16R8 — Recommended</option>
+                  <option value="esp32">Classic ESP32 — 4 MB flash</option>
+                </select>
+                <p id="hardware-description">
+                  Check the module marking before selecting. ESP32-S3 N16R8 is our recommended hardware.
+                </p>
+              </div>
               <div class="warning-banner" id="browser-notice" role="alert" hidden>
                 <svg aria-hidden="true" viewBox="0 0 24 24">
                   <path d="M12 3 2.5 20h19L12 3Z" />
@@ -173,7 +192,7 @@
                 <div class="operation-copy">
                   <p class="operation-label">Full installation</p>
                   <p>Bootloader, partitions, and firmware will be written together.</p>
-                  <span>Existing ESP32 data will be erased.</span>
+                  <span>Back up first. A full erase removes existing settings and data.</span>
                 </div>
                 <div class="operation-action">
                   <esp-web-install-button id="full-install-button">
@@ -210,7 +229,7 @@
               <div class="flash-protocol" id="flash-protocol">
                 <div class="board-visual" aria-hidden="true">
                   <span class="board-port"></span>
-                  <span class="board-chip">ESP32</span>
+                  <span class="board-chip" id="board-chip">ESP32</span>
                   <span class="board-led"></span>
                   <span class="board-trace trace-one"></span>
                   <span class="board-trace trace-two"></span>
@@ -226,7 +245,11 @@
                     <li><strong>Tap RESET/EN</strong> while continuing to hold BOOT.</li>
                     <li><strong>Release BOOT</strong> when “Erasing” begins.</li>
                   </ol>
-                  <p class="usb-note">Keep the USB cable connected until installation completes.</p>
+                  <p class="usb-note">
+                    Keep the USB cable connected until installation completes.
+                    For N16R8 boards with two USB ports, prefer the USB-to-UART port
+                    for this firmware's UART0 logs.
+                  </p>
                 </div>
               </div>
             </div>
@@ -258,7 +281,7 @@
             </div>
             <a
               class="resource-action"
-              href="https://drive.google.com/uc?export=download&amp;id=1WbdoM37RBDYhs9QGDoOZBCct7QqRM8j5"
+              href="https://drive.google.com/file/d/1Cmf5eVVq14_sZ7eevV1roYvO_HcTo3D0/view?usp=sharing"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -306,7 +329,7 @@
         </div>
         <div>
           <p class="footer-label">DMI-HS</p>
-          <p>Standard ESP32 installer &middot; protected firmware delivery.</p>
+          <p>ESP32-S3 N16R8 + classic ESP32 &middot; protected firmware delivery.</p>
           <p class="footer-copyright">&copy; 2026 DMI-HS</p>
         </div>
       </footer>
