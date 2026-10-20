@@ -15,12 +15,17 @@ import {
   initializeAppCheck
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app-check.js";
 import { DMI_HS_UPDATER_CONFIG as config } from "./config.js?v=6";
+import { getFirmwareTarget } from "./functions/firmware-targets.mjs?v=1";
 
 const browserNotice = document.getElementById("browser-notice");
 const releaseError = document.getElementById("release-error");
 const releaseVersion = document.getElementById("release-version");
 const releasePublished = document.getElementById("release-published");
 const releaseState = document.getElementById("release-state");
+const releaseTarget = document.getElementById("release-target");
+const hardwareSelect = document.getElementById("hardware-select");
+const hardwareDescription = document.getElementById("hardware-description");
+const boardChip = document.getElementById("board-chip");
 const operations = document.getElementById("operations");
 const fullInstaller = document.getElementById("full-install-button");
 const fullAction = fullInstaller?.querySelector('[slot="activate"]');
@@ -48,6 +53,8 @@ let accessExpiresAt = 0;
 let prepareRetryAt = 0;
 let authBusy = false;
 let flashPhase = "idle";
+let selectedTargetId = "";
+let activeInstallDialog = null;
 const generatedManifestUrls = [];
 
 const firebaseApp = initializeApp(config.firebase);
@@ -70,6 +77,7 @@ const INSTALL_REPORTS_STORAGE_KEY = "dmiHsPendingInstallReportsV1";
 let preparedReleaseContext = null;
 let pendingInstallAttempt = null;
 let installReportFlushInFlight = false;
+let installReportRetryAt = 0;
 let pendingInstallReportsMemory = [];
 
 function showBrowserWarning() {
@@ -146,7 +154,48 @@ function setFlashPhase(phase, message) {
     flashProtocol.classList.toggle("is-complete", phase === "complete");
   }
   if (flashProtocolStatus && message) flashProtocolStatus.textContent = message;
+  syncHardwareControls();
   syncWorkflowState();
+}
+
+function hasOpenInstallDialog() {
+  return Boolean(activeInstallDialog?.isConnected);
+}
+
+function syncHardwareControls() {
+  const busy = authBusy || hasOpenInstallDialog();
+  if (hardwareSelect) hardwareSelect.disabled = busy;
+  if (signOutButton) signOutButton.disabled = busy;
+  if (prepareButton && busy) prepareButton.disabled = true;
+  if (fullAction) fullAction.disabled = !releaseIsReady || busy;
+}
+
+function changeHardware() {
+  if (authBusy || hasOpenInstallDialog()) {
+    if (hardwareSelect) hardwareSelect.value = selectedTargetId;
+    return;
+  }
+  const target = getFirmwareTarget(hardwareSelect?.value);
+  selectedTargetId = target?.id || "";
+  preparedReleaseContext = null;
+  pendingInstallAttempt = null;
+  hideReleaseError();
+  lockRelease(currentUser
+    ? "Hardware selection changed. Prepare the matching firmware before installing."
+    : "Select your hardware, then sign in to prepare its firmware.");
+  clearInstallerManifests();
+  if (releaseVersion) releaseVersion.textContent = "Protected";
+  if (releasePublished) releasePublished.textContent = "—";
+  if (releaseTarget) releaseTarget.textContent = target
+    ? `${target.label} / ${target.memory}`
+    : "Select hardware";
+  if (boardChip) boardChip.textContent = target?.chipFamily || "ESP32";
+  if (hardwareDescription) hardwareDescription.textContent = target?.id === "n16r8"
+    ? "Recommended: 16 MB flash and 8 MB octal PSRAM. Confirm N16R8 on the module; other ESP32-S3 variants are not supported by this release."
+    : target
+      ? "For existing classic ESP32 boards with 4 MB flash. This firmware is not for ESP32-S3."
+      : "Check the module marking before selecting. ESP32-S3 N16R8 is our recommended hardware.";
+  refreshAccessClock();
 }
 
 function hideReleaseError() {
@@ -173,12 +222,23 @@ function requireSignedStorageUrl(value, fieldName) {
   return parsed.href;
 }
 
-function validateRelease(value) {
+class ReleaseTargetError extends Error {}
+
+function validateRelease(value, requestedTargetId) {
   if (!value || typeof value !== "object") {
     throw new Error("The protected release response is invalid.");
   }
   if (typeof value.version !== "string" || value.version.trim() === "") {
     throw new Error("The protected release has no version.");
+  }
+  const target = getFirmwareTarget(requestedTargetId);
+  const legacyClassic = target?.id === "esp32" &&
+    value.target === undefined && value.chipFamily === undefined;
+  if (!target || (!legacyClassic &&
+      (value.target !== target.id || value.chipFamily !== target.chipFamily))) {
+    throw new ReleaseTargetError(
+      "The server did not return firmware for the selected hardware. Nothing will be flashed. Contact the operator to update the release backend."
+    );
   }
   if (!value.files || typeof value.files !== "object") {
     throw new Error("The protected release has no file list.");
@@ -193,6 +253,8 @@ function validateRelease(value) {
   }
 
   return {
+    target: target.id,
+    chipFamily: target.chipFamily,
     version: value.version.trim(),
     published:
       typeof value.published === "string" && value.published.trim()
@@ -265,6 +327,9 @@ function queueSuccessfulInstall(attempt) {
 }
 
 function isPermanentInstallReportError(error) {
+  if (error?.code === "functions/resource-exhausted" && error?.details?.retryable === true) {
+    return false;
+  }
   return new Set([
     "functions/invalid-argument",
     "functions/permission-denied",
@@ -274,13 +339,14 @@ function isPermanentInstallReportError(error) {
 }
 
 async function flushPendingInstallReports() {
-  if (installReportFlushInFlight || !currentUser) return;
+  if (installReportFlushInFlight || !currentUser || Date.now() < installReportRetryAt) return;
   installReportFlushInFlight = true;
   const reportingUid = currentUser.uid;
   const remaining = [];
 
   try {
-    for (const report of readPendingInstallReports()) {
+    const reports = readPendingInstallReports();
+    for (const [index, report] of reports.entries()) {
       if (report.uid !== reportingUid) {
         remaining.push(report);
         continue;
@@ -296,6 +362,14 @@ async function flushPendingInstallReports() {
         setAccessStatus("Installation succeeded and was recorded." + totalText, "ready");
       } catch (error) {
         console.warn("Successful installation report was not accepted", error);
+        if (error?.code === "functions/resource-exhausted" && error?.details?.retryable === true) {
+          const seconds = Number(error.details.retryAfterSeconds);
+          const waitSeconds = Number.isFinite(seconds) ? Math.min(86400, Math.max(1, seconds)) : 60;
+          installReportRetryAt = Date.now() + waitSeconds * 1000;
+          remaining.push(report, ...reports.slice(index + 1));
+          setAccessStatus("Installation succeeded. Recording is rate-limited; the report is saved for a later retry.", "ready");
+          break;
+        }
         if (!isPermanentInstallReportError(error)) remaining.push(report);
       }
     }
@@ -306,7 +380,7 @@ async function flushPendingInstallReports() {
 }
 
 function armInstallAttempt(operation) {
-  if (!releaseIsReady || !currentUser || !preparedReleaseContext) return;
+  if (!releaseIsReady || !currentUser || !preparedReleaseContext || hasOpenInstallDialog()) return;
   pendingInstallAttempt = {
     attemptId: createAttemptId(),
     grantId: preparedReleaseContext.grantId,
@@ -327,6 +401,7 @@ function watchInstallDialog(dialog) {
   const attempt = pendingInstallAttempt;
   pendingInstallAttempt = null;
   if (!attempt) return;
+  activeInstallDialog = dialog;
 
   let finished = false;
   let pollId = 0;
@@ -362,12 +437,22 @@ function watchInstallDialog(dialog) {
     } else if (!dialog.isConnected && normalizedState !== "finished") {
       setFlashPhase("idle", "The installer closed. Connect again when you are ready.");
     }
+    if (!dialog.isConnected && activeInstallDialog === dialog) {
+      activeInstallDialog = null;
+      syncHardwareControls();
+      refreshAccessClock();
+    }
     if (normalizedState === "finished" || normalizedState === "error" || !dialog.isConnected) {
       clearInterval(pollId);
     }
   };
   pollId = window.setInterval(inspect, 250);
-  dialog.addEventListener("closed", inspect, { once: true });
+  dialog.addEventListener("closed", () => {
+    if (activeInstallDialog === dialog) activeInstallDialog = null;
+    inspect();
+    syncHardwareControls();
+    refreshAccessClock();
+  }, { once: true });
   inspect();
 }
 
@@ -384,17 +469,24 @@ if (document.body) {
   installDialogObserver.observe(document.body, { childList: true, subtree: true });
 }
 
-function createInstallerManifest(release, parts) {
+function createInstallerManifest(release) {
+  const target = getFirmwareTarget(release.target);
+  if (!target || target.chipFamily !== release.chipFamily) {
+    throw new ReleaseTargetError("The firmware hardware target is invalid.");
+  }
   const manifest = {
-    name: "DMI-HS",
+    name: `DMI-HS ${target.label}`,
     version: release.version,
     new_install_prompt_erase: true,
     new_install_improv_wait_time: 0,
     builds: [
       {
-        chipFamily: "ESP32",
+        chipFamily: target.chipFamily,
         improv: false,
-        parts
+        parts: Object.entries(target.offsets).map(([key, offset]) => ({
+          path: release.files[key],
+          offset
+        }))
       }
     ]
   };
@@ -413,7 +505,7 @@ function clearInstallerManifests() {
 }
 
 function syncFlashActions() {
-  if (fullAction) fullAction.disabled = !releaseIsReady;
+  syncHardwareControls();
   syncWorkflowState();
 }
 
@@ -455,15 +547,17 @@ function refreshAccessClock() {
     releaseState.textContent = "Ready | expires in " + formatWait(remaining);
   }
 
-  if (!prepareButton || !currentUser || authBusy || releaseIsReady) return;
+  if (!prepareButton || !currentUser || authBusy || hasOpenInstallDialog() || releaseIsReady) return;
   if (prepareRetryAt > now) {
     const remaining = Math.ceil((prepareRetryAt - now) / 1000);
     prepareButton.disabled = true;
     prepareButton.textContent = "Try again in " + formatWait(remaining);
   } else {
     prepareRetryAt = 0;
-    prepareButton.disabled = false;
-    prepareButton.textContent = "Prepare protected firmware";
+    prepareButton.disabled = !getFirmwareTarget(selectedTargetId);
+    prepareButton.textContent = selectedTargetId
+      ? "Prepare protected firmware"
+      : "Select hardware first";
   }
 }
 
@@ -472,10 +566,12 @@ function setAuthBusy(busy) {
   if (signInButton) signInButton.disabled = busy;
   if (signOutButton) signOutButton.disabled = busy;
   if (prepareButton && busy) prepareButton.disabled = true;
+  syncHardwareControls();
   refreshAccessClock();
 }
 
 function describeFirebaseError(error) {
+  if (error instanceof ReleaseTargetError) return error.message;
   const code = typeof error?.code === "string" ? error.code : "";
   if (code === "auth/popup-closed-by-user") return "Sign-in was cancelled.";
   if (code === "auth/popup-blocked") return "Allow the Google sign-in popup and try again.";
@@ -525,7 +621,9 @@ async function signOutCurrentUser() {
 }
 
 async function prepareInstaller() {
-  if (!currentUser || authBusy) return;
+  const target = getFirmwareTarget(selectedTargetId);
+  if (!currentUser || authBusy || hasOpenInstallDialog() || !target) return;
+  const requestingUid = currentUser.uid;
   preparedReleaseContext = null;
   pendingInstallAttempt = null;
   hideReleaseError();
@@ -538,21 +636,22 @@ async function prepareInstaller() {
   setAccessStatus("Verifying account and request quota...");
 
   try {
-    const response = await getProtectedRelease({});
-    const release = validateRelease(response.data);
+    const response = await getProtectedRelease({ target: target.id });
+    const release = validateRelease(response.data, target.id);
     await customElements.whenDefined("esp-web-install-button");
+    if (currentUser?.uid !== requestingUid || selectedTargetId !== target.id) {
+      lockRelease("Account or hardware changed. Prepare the installer again.");
+      return;
+    }
     clearInstallerManifests();
 
-    const fullManifestUrl = createInstallerManifest(release, [
-      { path: release.files.bootloader, offset: 0x1000 },
-      { path: release.files.partitions, offset: 0x8000 },
-      { path: release.files.firmware, offset: 0x20000 }
-    ]);
+    const fullManifestUrl = createInstallerManifest(release);
 
     if (fullInstaller) fullInstaller.manifest = fullManifestUrl;
     preparedReleaseContext = {
       grantId: release.grantId,
-      version: release.version
+      version: release.version,
+      target: release.target
     };
     releaseIsReady = true;
     accessExpiresAt = release.expiresAt;
@@ -564,7 +663,7 @@ async function prepareInstaller() {
     const quotaText = Number.isFinite(hourRemaining)
       ? " " + hourRemaining + " preparation(s) remain this hour."
       : "";
-    setAccessStatus("Secure firmware access is ready." + quotaText, "ready");
+    setAccessStatus(`${target.label} firmware access is ready.` + quotaText, "ready");
     if (prepareButton) {
       prepareButton.disabled = true;
       prepareButton.textContent = "Installer ready";
@@ -620,10 +719,12 @@ onAuthStateChanged(auth, (user) => {
 signInButton?.addEventListener("click", signIn);
 signOutButton?.addEventListener("click", signOutCurrentUser);
 prepareButton?.addEventListener("click", prepareInstaller);
+hardwareSelect?.addEventListener("change", changeHardware);
 fullAction?.addEventListener("click", () => armInstallAttempt("full-install"));
 window.addEventListener("beforeunload", clearInstallerManifests);
 
 showBrowserWarning();
+changeHardware();
 syncFlashActions();
 syncWorkflowState();
 setInterval(refreshAccessClock, 1000);

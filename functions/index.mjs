@@ -13,21 +13,22 @@ import {
 import {
   applySuccessfulInstall
 } from "./install-metrics.mjs";
+import { createIpRequestGuard, withIpRequestLimit } from "./ip-rate-limit.mjs";
+import {
+  requireFirmwareTarget,
+  readTargetRelease,
+  createSignedFiles
+} from "./firmware-release.mjs";
 
 initializeApp();
 const cloudStorage = new Storage();
 
 const REGION = "asia-southeast1";
 const BUCKET_NAME = "dmi-hs.firebasestorage.app";
-const RELEASE_OBJECT = "release.json";
 const INSTALL_METRICS_PATH = "firmwareInstallerInstallMetrics";
 const INSTALL_REPORT_GRACE_MS = 15 * 60 * 1000;
 const MAX_SUCCESSES_PER_GRANT = 5;
-const FIRMWARE_OBJECTS = Object.freeze({
-  bootloader: "bootloader.bin",
-  partitions: "partitions.bin",
-  firmware: "firmware.bin"
-});
+const IP_REQUEST_LIMIT_PATH = "firmwareInstallerIpRequestLimits";
 
 function integerSetting(name, fallback, minimum, maximum) {
   const parsed = Number.parseInt(process.env[name] || "", 10);
@@ -49,6 +50,40 @@ function approvedEmails() {
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean)
   );
+}
+
+const enforceIpRequests = createIpRequestGuard({
+  transact: (dayKey, update) => getDatabase().ref(`${IP_REQUEST_LIMIT_PATH}/${dayKey}`)
+    .transaction(update, undefined, false),
+  limits: {
+    perIpMinute: integerSetting("LIMIT_IP_REQUESTS_MINUTE", 10, 1, 100),
+    perIpHour: integerSetting("LIMIT_IP_REQUESTS_HOUR", 60, 1, 1000),
+    perIpDay: integerSetting("LIMIT_IP_REQUESTS_DAY", 100, 1, 2000),
+    globalDay: integerSetting("LIMIT_ALL_REQUESTS_DAY", 1000, 1, 10000)
+  },
+  identity: {
+    trustedHops: integerSetting("IP_TRUSTED_PROXY_HOPS", 1, 1, 5),
+    emulator: process.env.FUNCTIONS_EMULATOR === "true"
+  },
+  ErrorType: HttpsError,
+  onBackendError: () => logger.error("Installer IP quota unavailable; requests denied")
+});
+
+let nextIpCleanupAt = 0;
+async function cleanupIpRequests(now) {
+  if (now.getTime() < nextIpCleanupAt) return;
+  nextIpCleanupAt = now.getTime() + 3_600_000;
+  const cutoff = new Date(now);
+  cutoff.setUTCDate(cutoff.getUTCDate() - 3);
+  const ref = getDatabase().ref(IP_REQUEST_LIMIT_PATH);
+  try {
+    const old = await ref.orderByKey().endAt(utcWindowKeys(cutoff).dayKey).limitToFirst(7).once("value");
+    const updates = {};
+    old.forEach((child) => { updates[child.key] = null; });
+    if (Object.keys(updates).length) await ref.update(updates);
+  } catch {
+    logger.warn("Installer IP quota cleanup deferred");
+  }
 }
 
 function requireApprovedInstaller(request) {
@@ -88,36 +123,19 @@ function installerUidKey(uid) {
   return createHash("sha256").update(uid).digest("hex").slice(0, 32);
 }
 
-function validateRelease(value) {
-  if (!value || typeof value !== "object") {
-    throw new Error("release.json is not an object");
-  }
-  if (typeof value.version !== "string" || value.version.trim() === "") {
-    throw new Error("release.json has no version");
-  }
-  return {
-    version: value.version.trim(),
-    published:
-      typeof value.published === "string" && value.published.trim() !== ""
-        ? value.published.trim()
-        : "Not specified"
-  };
-}
-
-async function readRelease(bucket) {
+async function readRelease(bucket, target) {
   try {
-    const [contents] = await bucket.file(RELEASE_OBJECT).download();
-    return validateRelease(JSON.parse(contents.toString("utf8")));
+    return await readTargetRelease(bucket, target);
   } catch (error) {
     logger.error("Protected release could not be read", error);
     throw new HttpsError(
       "failed-precondition",
-      "The firmware release is not ready. Contact the operator."
+      `The ${target.label} firmware release is not ready. Contact the operator.`
     );
   }
 }
 
-async function enforceRateLimit(uid, now) {
+async function enforceRateLimit(uid, ipKey, now) {
   const perUserHour = integerSetting("LIMIT_PER_USER_HOUR", 3, 1, 50);
   const perUserDay = integerSetting("LIMIT_PER_USER_DAY", 10, 1, 200);
   const globalDay = integerSetting("LIMIT_GLOBAL_DAY", 30, 1, 1000);
@@ -132,6 +150,9 @@ async function enforceRateLimit(uid, now) {
     (current) => {
       decision = applyRateLimit(current, {
         uidKey,
+        ipKey,
+        perIpHour: integerSetting("LIMIT_PER_IP_HOUR", 3, 1, 50),
+        perIpDay: integerSetting("LIMIT_PER_IP_DAY", 10, 1, 200),
         hourKey,
         nowMs: now.getTime(),
         perUserHour,
@@ -175,6 +196,7 @@ async function createInstallGrant(installer, release, now, expiresAt) {
   const grant = {
     uidKey: installerUidKey(installer.uid),
     version: release.version,
+    target: release.target,
     issuedAtMs: now.getTime(),
     expiresAtMs: expiresAt.getTime(),
     reportByMs: expiresAt.getTime() + INSTALL_REPORT_GRACE_MS,
@@ -218,20 +240,6 @@ function requireReportField(value, name, pattern) {
   return normalized;
 }
 
-async function createSignedFiles(bucket, expiresAt) {
-  const entries = await Promise.all(
-    Object.entries(FIRMWARE_OBJECTS).map(async ([key, objectName]) => {
-      const [url] = await bucket.file(objectName).getSignedUrl({
-        version: "v4",
-        action: "read",
-        expires: expiresAt
-      });
-      return [key, url];
-    })
-  );
-  return Object.fromEntries(entries);
-}
-
 export const getFirmwareRelease = onCall(
   {
     region: REGION,
@@ -244,17 +252,26 @@ export const getFirmwareRelease = onCall(
     invoker: "public",
     enforceAppCheck: false
   },
-  async (request) => {
+  withIpRequestLimit(enforceIpRequests, async (request, network) => {
     const installer = requireApprovedInstaller(request);
+    let target;
+    try {
+      target = requireFirmwareTarget(request.data?.target);
+    } catch {
+      throw new HttpsError("invalid-argument", "Select a supported hardware target.");
+    }
+    const now = network.now;
+    // Deny before Storage metadata reads, signing, or grant writes. A failed
+    // release preparation still consumes its quota to bound retry costs.
+    const remaining = await enforceRateLimit(installer.uid, network.ipKey, now);
+    await cleanupIpRequests(now);
     const bucket = cloudStorage.bucket(BUCKET_NAME);
-    const release = await readRelease(bucket);
-    const now = new Date();
-    const remaining = await enforceRateLimit(installer.uid, now);
+    const release = await readRelease(bucket, target);
     const ttlSeconds = integerSetting("SIGNED_URL_TTL_SECONDS", 180, 60, 900);
     const expiresAt = new Date(now.getTime() + ttlSeconds * 1000);
 
     try {
-      const files = await createSignedFiles(bucket, expiresAt);
+      const files = await createSignedFiles(bucket, target, expiresAt);
       const grantId = await createInstallGrant(
         installer,
         release,
@@ -265,6 +282,7 @@ export const getFirmwareRelease = onCall(
         uid: installer.uid,
         email: installer.email,
         version: release.version,
+        target: release.target,
         expiresAt: expiresAt.toISOString(),
         remaining
       });
@@ -282,7 +300,7 @@ export const getFirmwareRelease = onCall(
         "Secure firmware access could not be prepared. Contact the operator."
       );
     }
-  }
+  })
 );
 
 export const recordFirmwareInstall = onCall(
@@ -297,7 +315,7 @@ export const recordFirmwareInstall = onCall(
     invoker: "public",
     enforceAppCheck: false
   },
-  async (request) => {
+  withIpRequestLimit(enforceIpRequests, async (request) => {
     const installer = requireApprovedInstaller(request);
     const data = request.data && typeof request.data === "object"
       ? request.data
@@ -382,5 +400,5 @@ export const recordFirmwareInstall = onCall(
       duplicate: Boolean(decision.duplicate),
       counts: decision.counts
     };
-  }
+  })
 );

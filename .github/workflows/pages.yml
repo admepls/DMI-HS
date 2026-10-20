@@ -32,6 +32,9 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html app.js config.js styles.css _site/
+          mkdir -p _site/functions
+          # This public catalog is the only backend-directory file served.
+          cp functions/firmware-targets.mjs _site/functions/
           cp -R assets _site/assets
           touch _site/.nojekyll
 

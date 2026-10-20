@@ -1,4 +1,5 @@
 {
-  "version": "2026.09.01",
-  "published": "2026-09-01"
+  "target": "esp32",
+  "version": "1.0.1",
+  "published": "2026-10-20"
 }
