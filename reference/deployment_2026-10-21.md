@@ -55,3 +55,28 @@ For a rollback, return the website to the previous public artifact and the
 updater services to the recorded prior revisions. Do not restore revoked
 download tokens or change firmware objects, Storage rules or other services.
 Physical flashing and approved-user sign-in remain separate operator tests.
+
+## Completed verification
+
+- Firebase deployment succeeded. Active revisions:
+  `getfirmwarerelease-00004-cog` and `recordfirmwareinstall-00003-hug`.
+- Both callables passed live CORS checks and rejected unauthenticated requests
+  with HTTP 401; anonymous firmware reads returned HTTP 403.
+- All eight unrelated functions retained their original revision/update time.
+  Existing installer configuration was compared before and after deployment.
+- All 50 tests and syntax checks passed; the dependency audit reported zero
+  vulnerabilities.
+- [PR #1](https://github.com/admepls/DMI-HS/pull/1) merged as
+  `35f0b36861126969cb5a5bf7ee15c2bbf2557cc8`.
+- [Pages deployment](https://github.com/admepls/DMI-HS/actions/runs/39462083361)
+  succeeded. Pages now uses the workflow publisher.
+- Live `index.html`, `app.js`, `styles.css`, `config.js` and the public hardware
+  catalog match the release source after line-ending normalization. The new
+  portal link and both hardware options are present.
+- Pages returns HTTP 404 for `functions/index.mjs`,
+  `functions/.env.dmi-hs` and `firmware.bin`.
+- The original local `main` worktree was not reset or switched. Deployment used
+  the isolated release worktree; unrelated edits remain available locally.
+
+The current uploaded WROOM version-label caveat above remains unresolved.
+Neither a firmware rebuild nor a physical installation was performed.

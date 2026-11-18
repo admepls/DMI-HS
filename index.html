@@ -15,7 +15,7 @@
       type="module"
       src="https://unpkg.com/esp-web-tools@10.1.0/dist/web/install-button.js?module"
     ></script>
-    <script type="module" src="app.js?v=8"></script>
+    <script type="module" src="app.js?v=9"></script>
   </head>
   <body>
     <div class="ambient ambient-one" aria-hidden="true"></div>
@@ -146,10 +146,11 @@
                 <select id="hardware-select" aria-describedby="hardware-description">
                   <option value="">Select your board...</option>
                   <option value="n16r8">ESP32-S3 N16R8 — Recommended</option>
-                  <option value="esp32">Classic ESP32 — 4 MB flash</option>
+                  <option value="esp32">Classic ESP32 (WROOM) — 4 MB, LAN only</option>
                 </select>
                 <p id="hardware-description">
                   Check the module marking before selecting. ESP32-S3 N16R8 is our recommended hardware.
+                  Classic ESP32 (WROOM) works on LAN only and needs a W5500 Ethernet module.
                 </p>
               </div>
               <div class="warning-banner" id="browser-notice" role="alert" hidden>
@@ -250,7 +251,7 @@
         <div class="section-heading compact">
           <div>
             <p class="eyebrow">Companion resources</p>
-            <h2 id="resources-title">Finish the deployment.</h2>
+            <h2 id="resources-title">Finish the <a href="/instruction.html">deployment</a>.</h2>
           </div>
         </div>
 

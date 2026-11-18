@@ -2,8 +2,11 @@
 
 GitHub Pages installer for standard, non-encrypted DMI-HS firmware on:
 
-- **ESP32-S3 N16R8 — recommended:** 16 MB flash and 8 MB octal PSRAM.
-- **Classic ESP32:** existing 4 MB flash hardware remains supported.
+- **ESP32-S3 N16R8 — recommended:** 16 MB flash and 8 MB octal PSRAM. Connects
+  to the router by Wi-Fi or LAN (W5500).
+- **Classic ESP32 (WROOM) — LAN only:** existing 4 MB flash hardware remains
+  supported. It needs a W5500 Ethernet module; Wi-Fi is used only for the
+  setup/recovery hotspot, never for the router connection.
 
 N16R8 provides more flash storage and PSRAM headroom; it is not a promise of a
 particular traffic capacity. Confirm the module marking: an arbitrary ESP32-S3
@@ -179,7 +182,7 @@ n16r8/
 
 | Selection | PlatformIO environment | Chip family | Bootloader | Partitions | App |
 | --- | --- | --- | --- | --- | --- |
-| Classic ESP32 / 4 MB | `HS` | `ESP32` | `0x1000` | `0x8000` | `0x20000` |
+| Classic ESP32 (WROOM) / 4 MB, LAN only | `HS` | `ESP32` | `0x1000` | `0x8000` | `0x20000` |
 | ESP32-S3 N16R8 / 16 MB + 8 MB PSRAM | `n16r8` | `ESP32-S3` | `0x0000` | `0x8000` | `0x20000` |
 
 For **each target**, use all three `.bin` files from the same standard DMI-HS

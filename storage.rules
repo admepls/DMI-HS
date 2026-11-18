@@ -2,8 +2,10 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Firmware is private. The callable backend uses Admin/IAM access and
-    // returns short-lived signed URLs only after authentication and quotas.
+    // Private firmware and skins. The firmware backend issues approved signed
+    // URLs. The Premium backend checks Auth + App Check + verified purchases
+    // before returning bounded skin data. No public get/list fallback.
+    // STAGED: deploy only after the updated app/backend are tested together.
     match /{allPaths=**} {
       allow read, write: if false;
     }
