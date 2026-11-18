@@ -191,10 +191,10 @@ function changeHardware() {
     : "Select hardware";
   if (boardChip) boardChip.textContent = target?.chipFamily || "ESP32";
   if (hardwareDescription) hardwareDescription.textContent = target?.id === "n16r8"
-    ? "Recommended: 16 MB flash and 8 MB octal PSRAM. Confirm N16R8 on the module; other ESP32-S3 variants are not supported by this release."
+    ? "Recommended: 16 MB flash and 8 MB octal PSRAM. Connects to the router by Wi-Fi or LAN (W5500). Confirm N16R8 on the module; other ESP32-S3 variants are not supported by this release."
     : target
-      ? "For existing classic ESP32 boards with 4 MB flash. This firmware is not for ESP32-S3."
-      : "Check the module marking before selecting. ESP32-S3 N16R8 is our recommended hardware.";
+      ? "Classic ESP32 (WROOM) with 4 MB flash: LAN only. Connect a W5500 Ethernet module to reach the router; Wi-Fi is used only for the setup/recovery hotspot. This firmware is not for ESP32-S3."
+      : "Check the module marking before selecting. ESP32-S3 N16R8 is our recommended hardware. Classic ESP32 (WROOM) works on LAN only.";
   refreshAccessClock();
 }
 
